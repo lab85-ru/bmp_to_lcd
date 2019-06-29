@@ -1,5 +1,6 @@
 ================================================================================
- Converting BMP grayscale(8 bit) -> array C code for SSD1309 (128x64)
+ Converting BMP:
+ Grayscale(8 bit) or Black/White(1 bit) -> array C code for SSD1309 (128x64)
  Ver 0.1 2019.
  GIT = ()
 ================================================================================

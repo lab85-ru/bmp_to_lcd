@@ -12,7 +12,7 @@
 
 
 const char PRINT_TIRE[] = {"================================================================================\n\r"};
-const char PRINT_PROG_NAME[] = {" Converting BMP grayscale(8 bit) -> array C code for SSD1309 (128x64)\n\r"};
+const char PRINT_PROG_NAME[] = {" Converting BMP:\n Grayscale(8 bit) or Black/White(1 bit) -> array C code for SSD1309 (128x64)\n\r"};
 const char PRINT_VERSION[] = {" Ver 0.1 2019.\n\r"};
 
 const uint32_t BUF_SIZE = 1*1024*1024; // размер памяти для файла BMP.
@@ -33,7 +33,7 @@ int main(int argc, char * argv[])
     size_t result = 0;
 
 	size_t x,yo,yi;
-	uint8_t po, pixo, p;
+	uint8_t po, pixo, p, b;
 
 	int c; // счетчик количества HEX елементов с строке
 
@@ -137,10 +137,19 @@ int main(int argc, char * argv[])
 	printf(" Resolution : %d x %d\n", pic_w, pic_h);
 	printf("=================================================\n");
 
-	if (pic_color_bit != 8){
-		printf("ERROR: This BMP file color bit %d != 8\n", pic_color_bit);
+	if (pic_color_bit != 8 && pic_color_bit != 1){
+		printf("ERROR: This BMP file color bit %d != 8 or != 1\n", pic_color_bit);
 		return 1;
 	}
+
+	v = mem + bmp_head_p->bfOffBits;
+
+	if (pic_color_bit == 8) goto picture_8bit;
+	if (pic_color_bit == 1) goto picture_1bit;
+		
+	
+	return 1;
+
 
 /* обрабатываем картинку с любым разрешением
 	if (pic_w != 128){
@@ -152,7 +161,6 @@ int main(int argc, char * argv[])
 		return 1;
 	}
 */
-	v = mem + bmp_head_p->bfOffBits;
 
 // Картинка располагается в памяти в следующем порядке
 // начало памяти соотвествует - левый нижний угол картинки
@@ -167,9 +175,9 @@ int main(int argc, char * argv[])
 // +                                       X,Y +
 // +-------------------------------------------+
 
-
-	// длинна строки данных (в массиве) кратна 4 !
-    pic_wl = (3 * pic_w) % 4; // разница сколько нехватае пикселей до кратности 4
+picture_8bit:
+	// длинна строки данных (в массиве) должна быть кратна 4 байтам !
+    pic_wl = (3 * pic_w) % 4; // разница сколько нехватае пикселей до кратности 4 байтам
 
 	printf("\nData from BMP picture:\n");
     print_rule(pic_w + pic_wl, 0); // выводим линейку на экран
@@ -232,6 +240,83 @@ int main(int argc, char * argv[])
 				c = 0;
 				printf("\n    ");
 			}
+		}
+	}
+	printf("\n");
+
+	return 0;
+//-----------------------------------------------------------------------------
+picture_1bit:
+	// длинна строки данных (в массиве) должна быть кратна 4 байтам !
+    pic_wl = (pic_w % 32);
+    if (pic_wl) pic_wl = 32 - pic_wl; 
+
+	printf("\nData from BMP picture:\n");
+    print_rule(pic_w + pic_wl, 0); // выводим линейку на экран
+
+	// выводим картинку с разворотом (сначала выбираем нижние элементы) 
+	for (yi=0; yi<pic_h; yi++){
+		for (x=0; x<pic_w/8; x++){
+			p = *(v + x + (((pic_h - 1) - yi) * (pic_w + pic_wl)/8));
+			for(b=0; b<8; b++){
+			    if (p & (0x80>>b)) pixo = '*'; else pixo = ' ';
+			    printf("%c", pixo);
+			}
+		}
+		printf("|\n");
+    }
+	printf("\n");
+    print_rule(pic_w + pic_wl, 0); // выводим линейку на экран
+
+//-----------------------------------------------------------------------------
+	printf("\nData TO LCD array:\n");
+    print_rule(pic_w + pic_wl, 1); // выводим линейку на экран
+
+	// выводим данные на экран для проверки
+	for (yo=0; yo<pic_h / 8; yo++){
+		for (x=0; x<pic_w/8; x++){
+
+			po = 0;
+			for(b=0; b<8; b++){
+			    for (yi=0; yi<pic_h / 8; yi++){
+				
+				    p = *(v + x + (( (pic_h - 1) - yi - (yo * 8)) * (pic_w + pic_wl)/8));
+				    if (p & (0x80>>b)) p = 1; else p = 0;
+
+				    if (p) pixo = 0x80; else pixo = 0;
+				    po = po >> 1;
+				    po |= pixo;
+			    }
+			    printf("%02X", po);
+			}//for b
+		}
+		printf("\n");
+	}
+//-----------------------------------------------------------------------------
+	printf("\nData TO C code array:\n");
+	printf("\n    ");
+	c = 0;
+	for (yo=0; yo<pic_h/8; yo++){
+		for (x=0; x<pic_w/8; x++){
+
+			po = 0;
+			for(b=0; b<8; b++){
+			    for (yi=0; yi<pic_h / 8; yi++){
+				
+				    p = *(v + x + (( (pic_h - 1) - yi - (yo * 8)) * (pic_w + pic_wl)/8));
+				    if (p & (0x80>>b)) p = 1; else p = 0;
+
+				    if (p) pixo = 0x80; else pixo = 0;
+				    po = po >> 1;
+				    po |= pixo;
+			    }
+			    printf("0x%02X,", po);
+    			c++;
+			    if (c == 16){
+				    c = 0;
+				    printf("\n    ");
+			    }
+			}//for b
 		}
 	}
 	printf("\n");
